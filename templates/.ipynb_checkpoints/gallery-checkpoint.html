@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gallery</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .comment {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            background-color: #f9f9f9;
+        }
+        .image-container {
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        .image-container.enlarged {
+            position: fixed;
+            max-width: 90vw;
+            max-height: 90vh;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1050;
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1040;
+            display: none;
+        }
+        .overlay.active {
+            display: block;
+        }
+        .star-container {
+            text-align: center;
+            cursor: pointer;
+        }
+        .star {
+            font-size: 2rem;
+            color: gray;
+            transition: color 0.3s ease;
+        }
+        .star.starred {
+            color: gold;
+        }
+        .average-rating {
+            font-size: 1.2rem;
+            margin-top: 10px;
+        }
+        .rating-count {
+            display: block;
+            margin-top: 5px;
+            font-size: 1rem;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <a class="navbar-brand" href="{{ url_for('index') }}">Art Portfolio</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">Home</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('gallery') }}">Gallery</a></li>
+                {% if session.get('logged_in') %}
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('upload') }}">Upload</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
+                {% else %}
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('login') }}">Login</a></li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <h2 class="text-center">Art Gallery</h2>
+        <div class="sorting-section mb-3">
+            <label for="sortSelect">Sort by:</label>
+            <select id="sortSelect" class="form-control d-inline-block w-auto" onchange="sortGallery()">
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+            </select>
+        </div>
+        <div class="row" id="galleryRow">
+            {% for image in images %}
+            <div class="col-12 mb-4" data-uploaded="{{ image.upload_date }}">
+                <div class="card image-container" onclick="toggleImage(this)">
+                    <img src="{{ url_for('static', filename='images/' + image.filename) }}" class="img-fluid rounded shadow-sm w-100 h-auto" alt="Artwork">
+                </div>
+                <div class="average-rating">
+                    Average Rating: <span id="average-rating-{{ loop.index }}">0.0</span> / 5.0
+                </div>
+                <div class="star-container mt-2">
+                    <span class="star" onclick="rateImage(this, 1, {{ loop.index }})">&#9733;</span>
+                    <span class="star" onclick="rateImage(this, 2, {{ loop.index }})">&#9733;</span>
+                    <span class="star" onclick="rateImage(this, 3, {{ loop.index }})">&#9733;</span>
+                    <span class="star" onclick="rateImage(this, 4, {{ loop.index }})">&#9733;</span>
+                    <span class="star" onclick="rateImage(this, 5, {{ loop.index }})">&#9733;</span>
+                </div>
+                <div class="rating-count" id="rating-count-{{ loop.index }}">(0 users rated)</div>
+                <div class="comment-section mt-3">
+                    <textarea id="comment-{{ loop.index }}" class="form-control" maxlength="100" placeholder="Add your comment (max 100 words)..."></textarea>
+                    <button class="btn btn-primary mt-2" onclick="submitComment({{ loop.index }})">Submit Comment</button>
+                    <div id="comments-list-{{ loop.index }}" class="comments-list mt-2"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay" onclick="toggleImage()"></div>
+
+    <script>
+        const ratingsData = {};
+        const userRatings = {};
+
+        function toggleImage(element) {
+            const overlay = document.getElementById('overlay');
+            if (element) {
+                element.classList.toggle('enlarged');
+                overlay.classList.toggle('active');
+            } else {
+                const enlargedImage = document.querySelector('.image-container.enlarged');
+                if (enlargedImage) {
+                    enlargedImage.classList.remove('enlarged');
+                    overlay.classList.remove('active');
+                }
+            }
+        }
+
+        function rateImage(element, rating, imageIndex) {
+            const userId = 'unique_user_id'; // Replace with unique user identification logic
+
+            if (!ratingsData[imageIndex]) {
+                ratingsData[imageIndex] = {
+                    totalRating: 0,
+                    usersRated: 0
+                };
+            }
+
+            if (!userRatings[userId]) {
+                userRatings[userId] = {};
+            }
+
+            if (userRatings[userId][imageIndex]) {
+                // User has already rated, update the rating
+                const previousRating = userRatings[userId][imageIndex];
+                ratingsData[imageIndex].totalRating -= previousRating;
+            } else {
+                // New user rating
+                ratingsData[imageIndex].usersRated++;
+            }
+
+            ratingsData[imageIndex].totalRating += rating;
+            userRatings[userId][imageIndex] = rating;
+
+            const allStars = element.parentNode.querySelectorAll('.star');
+            allStars.forEach((star, index) => {
+                if (index < rating) {
+                    star.classList.add('starred');
+                    star.style.color = 'gold';
+                } else {
+                    star.classList.remove('starred');
+                    star.style.color = 'gray';
+                }
+            });
+
+            const averageRating = (ratingsData[imageIndex].totalRating / ratingsData[imageIndex].usersRated).toFixed(1);
+            document.getElementById(`average-rating-${imageIndex}`).textContent = averageRating;
+            document.getElementById(`rating-count-${imageIndex}`).textContent = `(${ratingsData[imageIndex].usersRated} users rated)`;
+        }
+
+        function sortGallery() {
+            const sortSelect = document.getElementById('sortSelect');
+            const sortValue = sortSelect.value;
+            const galleryRow = document.getElementById('galleryRow');
+            const galleryItems = Array.from(galleryRow.children);
+
+            galleryItems.sort((a, b) => {
+                const dateA = new Date(a.getAttribute('data-uploaded'));
+                const dateB = new Date(b.getAttribute('data-uploaded'));
+                return sortValue === 'newest' ? dateB - dateA : dateA - dateB;
+            });
+
+            galleryItems.forEach(item => galleryRow.appendChild(item));
+        }
+
+        const commentsData = {};
+
+        function submitComment(imageIndex) {
+            const commentInput = document.getElementById(`comment-${imageIndex}`);
+            const commentText = commentInput.value.trim();
+            if (commentText.length > 0) {
+                if (!commentsData[imageIndex]) {
+                    commentsData[imageIndex] = [];
+                }
+                commentsData[imageIndex].push(commentText);
+                commentInput.value = '';
+                displayComments(imageIndex);
+            }
+        }
+
+        function displayComments(imageIndex) {
+            const commentsList = document.getElementById(`comments-list-${imageIndex}`);
+            commentsList.innerHTML = '';
+            commentsData[imageIndex].forEach(comment => {
+                const commentElement = document.createElement('div');
+                commentElement.classList.add('comment');
+                commentElement.textContent = comment;
+                commentsList.appendChild(commentElement);
+            });
+        }
+    </script>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

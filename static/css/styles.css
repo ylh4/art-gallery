@@ -1,0 +1,36 @@
+body {
+    background-color: #f9f9f9;
+    font-family: 'Comic Sans MS', cursive, sans-serif;
+}
+
+.navbar {
+    background-color: #ffebcd !important;
+}
+
+.navbar-brand {
+    font-size: 1.5rem;
+    color: #d2691e !important;
+}
+
+.nav-link {
+    color: #6b8e23 !important;
+}
+
+.card {
+    border: none;
+    border-radius: 15px;
+}
+
+.card img {
+    border-radius: 15px 15px 0 0;
+}
+
+.card-body {
+    background-color: #ffefd5;
+    text-align: center;
+}
+
+h2 {
+    color: #ff6347;
+    font-weight: bold;
+}

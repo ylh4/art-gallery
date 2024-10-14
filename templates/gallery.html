@@ -1,0 +1,189 @@
+html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gallery</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .comment {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            background-color: #f9f9f9;
+        }
+        .image-container {
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        .image-container.enlarged {
+            position: fixed;
+            max-width: 90vw;
+            max-height: 90vh;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1050;
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1040;
+            display: none;
+        }
+        .overlay.active {
+            display: block;
+        }
+        .star-container {
+            text-align: center;
+            cursor: pointer;
+        }
+        .star {
+            font-size: 2rem;
+            color: gray;
+            transition: color 0.3s ease;
+        }
+        .star.starred {
+            color: gold;
+        }
+        .average-rating {
+            font-size: 1.2rem;
+            margin-top: 10px;
+        }
+        .rating-count {
+            display: block;
+            margin-top: 5px;
+            font-size: 1rem;
+            color: #333;
+        }
+        .meta-data {
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top">
+        <a class="navbar-brand" href="{{ url_for('index') }}">Art Portfolio</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">Home</a></li>
+                <li class="nav-item"><a class="nav-link" href="/gallery">Gallery</a></li>
+                {% if session.get('logged_in') %}
+                <li class="nav-item"><a class="nav-link" href="/upload">Upload</a></li>
+                <li class="nav-item"><a class="nav-link" href="/logout">Logout</a></li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container mt-5 pt-5">
+        <h2 class="text-center">Art Gallery</h2>
+        <div class="sorting-section mb-3">
+            <label for="sortSelect">Sort by:</label>
+            <select id="sortSelect" class="form-control d-inline-block w-auto" onchange="sortGallery()">
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+            </select>
+        </div>
+        <div class="row" id="galleryRow">
+            {% for image in images %}
+            <div class="col-12 mb-4" data-uploaded="{{ image['upload_date'] }}">
+                <div class="card image-container" onclick="toggleImage(this)">
+                    <img src="{{ url_for('static', filename='images/' + image['filename']) }}" class="img-fluid rounded shadow-sm w-100 h-auto" alt="Artwork">
+                </div>
+                <div class="meta-data">
+                    <h5>Title: {{ image['title'] }}</h5>
+                    <p><strong>Artist:</strong> {{ image['artist'] }}</p>
+                    <p><strong>Date:</strong> {{ image['date'] }}</p>
+                    <p><strong>Medium:</strong> {{ image['medium'] }}</p>
+                    <p><strong>Inspiration:</strong> {{ image['inspiration'] }}</p>
+                    <p><strong>Cultural Context:</strong> {{ image['culturalContext'] }}</p>
+                    <p><strong>Subject Matter:</strong> {{ image['subjectMatter'] }}</p>
+                    <p><strong>Artist Statement:</strong> {{ image['artistStatement'] }}</p>
+                </div>
+                <div class="average-rating">
+                    Average Rating: <span id="average-rating-{{ loop.index }}">0.0</span> / 5.0
+                </div>
+                <div class="star-container mt-2">
+                    <span class="star" onclick="rateImage(this, 1, '{{ loop.index }}')">&#9733;</span>
+                    <span class="star" onclick="rateImage(this, 2, '{{ loop.index }}')">&#9733;</span>
+                    <span class="star" onclick="rateImage(this, 3, '{{ loop.index }}')">&#9733;</span>
+                    <span class="star" onclick="rateImage(this, 4, '{{ loop.index }}')">&#9733;</span>
+                    <span class="star" onclick="rateImage(this, 5, '{{ loop.index }}')">&#9733;</span>
+                </div>
+                <div class="rating-count" id="rating-count-{{ loop.index }}">(0 users rated)</div>
+                <div class="comment-section mt-3">
+                    <textarea id="comment-{{ loop.index }}" class="form-control" maxlength="100" placeholder="Add your comment (max 100 words)..."></textarea>
+                    <button class="btn btn-primary mt-2" onclick="submitComment({{ loop.index }})">Submit Comment</button>
+                    <div id="comments-list-{{ loop.index }}" class="comments-list mt-2"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay" onclick="toggleImage()"></div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Function to handle rating
+        function rateImage(element, ratingValue, index) {
+            // Unique identifier for this artwork's rating (using gallery index)
+            const ratingKey = `rating-${index}`;
+
+            // Get the existing ratings for the current artwork from local storage
+            let storedRatings = JSON.parse(localStorage.getItem(ratingKey)) || {};
+            const userId = 'user-1';  // This is a placeholder. Replace with a real unique user identifier.
+
+            // Check if user already rated
+            let previousRating = storedRatings[userId] || 0;
+
+            // Update the stored ratings for the current user
+            storedRatings[userId] = ratingValue;
+            localStorage.setItem(ratingKey, JSON.stringify(storedRatings));
+
+            // Update the star display
+            const stars = element.parentElement.querySelectorAll('.star');
+            stars.forEach((star, idx) => {
+                if (idx < ratingValue) {
+                    star.classList.add('starred');
+                } else {
+                    star.classList.remove('starred');
+                }
+            });
+
+            // Update rating count and average rating
+            const averageRatingSpan = document.getElementById(`average-rating-${index}`);
+            const ratingCountSpan = document.getElementById(`rating-count-${index}`);
+
+            let totalRating = 0;
+            let ratingCount = 0;
+
+            for (let user in storedRatings) {
+                totalRating += storedRatings[user];
+                ratingCount++;
+            }
+
+            let averageRating = (ratingCount > 0) ? totalRating / ratingCount : 0;
+
+            // Update the DOM
+            averageRatingSpan.innerText = averageRating.toFixed(1);
+            ratingCountSpan.innerText = `(${ratingCount} users rated)`;
+        }
+    </script>
+</body>
+</html>
