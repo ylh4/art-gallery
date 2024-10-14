@@ -6,6 +6,9 @@ import random
 app = Flask(__name__)
 app.config.from_object(Config)  # Load configuration from Config class
 
+# Initialize images list globally
+images = []
+
 @app.route('/')
 def index():
     # Filter artworks for the current month
@@ -102,5 +105,5 @@ def logout():
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    images = []  # Example data structure to hold image info, replace with a database in a real scenario
+    # Initialize images list to hold image info; replace this with a database in a real scenario
     app.run(debug=True)
