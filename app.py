@@ -2,12 +2,17 @@ from flask import Flask, render_template, request, redirect, url_for, session
 from config import Config  # Import the config file
 from datetime import datetime
 import random
+import os
+import logging
 
 app = Flask(__name__)
 app.config.from_object(Config)  # Load configuration from Config class
 
 # Initialize images list globally
 images = []
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
 
 @app.route('/')
 def index():
@@ -48,37 +53,48 @@ def index():
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
     if request.method == 'POST':
-        # Get metadata from the form
-        title = request.form['title']
-        artist = request.form['artist']
-        date = request.form['date']
-        medium = request.form['medium']
-        inspiration = request.form['inspiration']
-        culturalContext = request.form['culturalContext']
-        subjectMatter = request.form['subjectMatter']
-        artistStatement = request.form['artistStatement']
-        
-        # Process file upload
-        file = request.files['file']
-        if file:
-            filename = file.filename
-            file.save(f'static/images/{filename}')
-            
-            # Store metadata (in a real application, this would be saved in a database)
-            images.append({
-                'filename': filename,
-                'upload_date': datetime.now(),  # Replace with current date dynamically
-                'title': title,
-                'artist': artist,
-                'date': date,
-                'medium': medium,
-                'inspiration': inspiration,
-                'culturalContext': culturalContext,
-                'subjectMatter': subjectMatter,
-                'artistStatement': artistStatement,
-                'average_rating': 0  # Initialize with no rating
-            })
-            return redirect(url_for('gallery'))
+        try:
+            # Ensure the images directory exists
+            images_dir = os.path.join('static', 'images')
+            if not os.path.exists(images_dir):
+                logging.debug(f"Directory '{images_dir}' not found, creating it.")
+                os.makedirs(images_dir)
+
+            # Get metadata from the form
+            title = request.form['title']
+            artist = request.form['artist']
+            date = request.form['date']
+            medium = request.form['medium']
+            inspiration = request.form['inspiration']
+            culturalContext = request.form['culturalContext']
+            subjectMatter = request.form['subjectMatter']
+            artistStatement = request.form['artistStatement']
+
+            # Process file upload
+            file = request.files['file']
+            if file:
+                filename = file.filename
+                logging.debug(f"Attempting to save file '{filename}' to '{images_dir}'")
+                file.save(os.path.abspath(os.path.join(images_dir, filename)))
+
+                # Store metadata (in a real application, this would be saved in a database)
+                images.append({
+                    'filename': filename,
+                    'upload_date': datetime.now(),  # Replace with current date dynamically
+                    'title': title,
+                    'artist': artist,
+                    'date': date,
+                    'medium': medium,
+                    'inspiration': inspiration,
+                    'culturalContext': culturalContext,
+                    'subjectMatter': subjectMatter,
+                    'artistStatement': artistStatement,
+                    'average_rating': 0  # Initialize with no rating
+                })
+                return redirect(url_for('gallery'))
+        except Exception as e:
+            logging.error(f"Error occurred while uploading file: {str(e)}")
+            return render_template('upload.html', error=str(e))
 
     return render_template('upload.html')
 
